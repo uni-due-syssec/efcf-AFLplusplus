@@ -2313,5 +2313,9 @@ void __afl_set_persistent_mode(u8 mode) {
 
 }
 
+u8* __afl_get_coverage_pointer(u32 id) {
+  return __afl_area_ptr + (id % __afl_map_size);
+}
+
 #undef write_error
 

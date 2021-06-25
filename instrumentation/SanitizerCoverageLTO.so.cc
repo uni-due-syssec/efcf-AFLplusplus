@@ -1251,6 +1251,9 @@ void ModuleSanitizerCoverageLTO::instrumentFunction(
   bool                     IsLeafFunc = true;
   uint32_t                 skip_next = 0;
 
+  SmallVector<Instruction*, 16> DeprecatedCalls;
+  DenseMap<uint32_t, uint32_t> UserIdToUniqueId;
+
   for (auto &BB : F) {
 
     for (auto &IN : BB) {
@@ -1275,10 +1278,65 @@ void ModuleSanitizerCoverageLTO::instrumentFunction(
 
         }
 
-        if (FuncName.compare(StringRef("__afl_coverage_interesting"))) continue;
+        if (FuncName.equals(StringRef("__afl_coverage_interesting"))) {
 
-        Value *val = ConstantInt::get(Int32Ty, ++afl_global_id);
-        callInst->setOperand(1, val);
+          Value *val = ConstantInt::get(Int32Ty, ++afl_global_id);
+          callInst->setOperand(1, val);
+
+        } else if (FuncName.equals(StringRef("__afl_get_coverage_pointer"))) {
+
+          ConstantInt* CurLoc = nullptr;
+          Value* user_id_val = callInst->getOperand(0);
+          //if (!user_id_val) continue;
+
+          auto const_int = dyn_cast<ConstantInt>(user_id_val);
+          // not a constant as a parameter, not clear what the user intended so
+          // we keep the function call as is.
+          if (!const_int) {
+            errs() << "non constant parameter " << *user_id_val << "\n";
+            continue;
+          }
+
+          // otherwise we perform manual "inlining" and along the way assign a
+          // globally unique id.
+         
+          if (const_int->isZero()) {
+            // we assume the user just wants some unique location when 0 is
+            // supplied as an argument.
+            CurLoc = ConstantInt::get(Int32Tyi, ++afl_global_id);
+          } else {
+            // otherwise we look up whether the constant parameter is already
+            // known, otherwise we generate a matching unique ID.
+            uint32_t userid = (uint32_t)const_int->getZExtValue();
+            uint32_t uniqueid = UserIdToUniqueId.lookup(userid);
+            if (uniqueid == 0) {
+              uniqueid = ++afl_global_id;
+              UserIdToUniqueId.insert(std::make_pair(userid, uniqueid));
+            }
+            CurLoc = ConstantInt::get(Int32Tyi, uniqueid);
+          }
+
+          IRBuilder<> IRB(callInst);
+          /* Load SHM pointer */
+          Value *MapPtrIdx = nullptr;
+
+          if (map_addr) {
+
+            MapPtrIdx = IRB.CreateGEP(MapPtrFixed, CurLoc);
+
+          } else {
+
+            LoadInst *MapPtr = IRB.CreateLoad(AFLMapPtr);
+            SetNoSanitizeMetadata(MapPtr);
+            MapPtrIdx = IRB.CreateGEP(MapPtr, CurLoc);
+
+          }
+
+          callInst->replaceAllUsesWith(MapPtrIdx);
+          // will delete later
+          DeprecatedCalls.push_back(callInst);
+
+        }
         ++inst;
 
       }
@@ -1438,6 +1496,12 @@ void ModuleSanitizerCoverageLTO::instrumentFunction(
       }
 
     }
+
+  }
+
+  for (auto I : DeprecatedCalls) {
+
+    I->eraseFromParent();
 
   }
 
