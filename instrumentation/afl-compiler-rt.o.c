@@ -2079,5 +2079,9 @@ void __afl_coverage_interesting(u8 val, u32 id) {
 
 }
 
+u8* __afl_get_coverage_pointer(u32 id) {
+  return __afl_area_ptr + (id % __afl_map_size);
+}
+
 #undef write_error
 
