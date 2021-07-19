@@ -811,7 +811,7 @@ struct custom_mutator {
    * @param buf_size Size of the test case
    * @return The amount of fuzzes to perform on this queue entry, 0 = skip
    */
-  u32 (*afl_custom_fuzz_count)(void *data, const u8 *buf, size_t buf_size);
+  u32 (*afl_custom_fuzz_count)(void *data, const u8 *buf, size_t buf_size, u32 runs);
 
   /**
    * Perform custom mutations on a given input

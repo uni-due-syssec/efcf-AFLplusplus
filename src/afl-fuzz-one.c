@@ -1818,7 +1818,7 @@ custom_mutator_stage:
 
       if (el->afl_custom_fuzz_count) {
 
-        afl->stage_max = el->afl_custom_fuzz_count(el->data, out_buf, len);
+        afl->stage_max = el->afl_custom_fuzz_count(el->data, out_buf, len, saved_max);
 
       } else {
 
@@ -1883,7 +1883,7 @@ custom_mutator_stage:
 
             }
 
-            if (!el->afl_custom_fuzz_count) {
+            /*if (!el->afl_custom_fuzz_count) {*/
 
               /* If we're finding new stuff, let's run for a bit longer, limits
                 permitting. */
@@ -1901,7 +1901,7 @@ custom_mutator_stage:
 
               }
 
-            }
+            /*}*/
 
           }
 
