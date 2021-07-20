@@ -1813,6 +1813,8 @@ custom_mutator_stage:
   LIST_FOREACH(&afl->custom_mutator_list, struct custom_mutator, {
 
     if (el->afl_custom_fuzz) {
+          
+      memcpy(out_buf, in_buf, len);
 
       afl->current_custom_fuzz = el;
 
@@ -1840,6 +1842,7 @@ custom_mutator_stage:
           u8 *                new_buf = NULL;
           u32                 target_len = 0;
 
+#if 0
           /* check if splicing makes sense yet (enough entries) */
           if (likely(afl->ready_for_splicing_count > 1)) {
 
@@ -1862,6 +1865,7 @@ custom_mutator_stage:
             target_len = target->len;
 
           }
+#endif
 
           u8 *mutated_buf = NULL;
 
@@ -1905,12 +1909,14 @@ custom_mutator_stage:
 
           }
 
+#if 0
           /* `(afl->)out_buf` may have been changed by the call to custom_fuzz
            */
           /* TODO: Only do this when `mutated_buf` == `out_buf`? Branch vs
            * Memcpy.
            */
           memcpy(out_buf, in_buf, len);
+#endif
 
         }
 
@@ -2886,7 +2892,7 @@ havoc_stage:
 
 retry_splicing:
 
-  if (afl->use_splicing && splice_cycle++ < SPLICE_CYCLES &&
+  if (false && afl->use_splicing && splice_cycle++ < SPLICE_CYCLES &&
       afl->ready_for_splicing_count > 1 && afl->queue_cur->len >= 4) {
 
     struct queue_entry *target;
