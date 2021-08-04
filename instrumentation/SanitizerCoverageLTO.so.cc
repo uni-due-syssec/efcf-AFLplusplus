@@ -595,6 +595,7 @@ bool ModuleSanitizerCoverageLTO::instrumentModule(
             bool   isStrncasecmp = true;
             bool   isIntMemcpy = true;
             bool   isStdString = true;
+            bool   addedNull = false;
             size_t optLen = 0;
 
             Function *Callee = callInst->getCalledFunction();
@@ -731,7 +732,7 @@ bool ModuleSanitizerCoverageLTO::instrumentModule(
             if (!HasStr2) {
 
               auto *Ptr = dyn_cast<ConstantExpr>(Str2P);
-              if (Ptr && Ptr->getOpcode() == Instruction::GetElementPtr) {
+              if (Ptr && Ptr->isGEPWithNoNotionalOverIndexing()) {
 
                 if (auto *Var = dyn_cast<GlobalVariable>(Ptr->getOperand(0))) {
 
@@ -812,7 +813,7 @@ bool ModuleSanitizerCoverageLTO::instrumentModule(
 
               auto Ptr = dyn_cast<ConstantExpr>(Str1P);
 
-              if (Ptr && Ptr->getOpcode() == Instruction::GetElementPtr) {
+              if (Ptr && Ptr->isGEPWithNoNotionalOverIndexing()) {
 
                 if (auto *Var = dyn_cast<GlobalVariable>(Ptr->getOperand(0))) {
 
@@ -881,8 +882,8 @@ bool ModuleSanitizerCoverageLTO::instrumentModule(
 
                 if (optLen < 2) { continue; }
                 if (literalLength + 1 == optLen) {  // add null byte
-
                   thestring.append("\0", 1);
+                  addedNull = true;
 
                 }
 
@@ -894,18 +895,14 @@ bool ModuleSanitizerCoverageLTO::instrumentModule(
             // was not already added
             if (!isMemcmp) {
 
-              /*
-                            if (addedNull == false && thestring[optLen - 1] !=
-                 '\0') {
+              if (addedNull == false && thestring[optLen - 1] != '\0') {
 
-                              thestring.append("\0", 1);  // add null byte
-                              optLen++;
+                thestring.append("\0", 1);  // add null byte
+                optLen++;
 
-                            }
+              }
 
-              */
-              if (!isStdString &&
-                  thestring.find('\0', 0) != std::string::npos) {
+              if (!isStdString) {
 
                 // ensure we do not have garbage
                 size_t offset = thestring.find('\0', 0);
@@ -1059,7 +1056,7 @@ bool ModuleSanitizerCoverageLTO::instrumentModule(
 
       if (count) {
 
-        auto ptrhld = std::unique_ptr<char[]>(new char[memlen + count]);
+        auto ptrhld = std::unique_ptr<char []>(new char[memlen + count]);
 
         count = 0;
 
@@ -1258,14 +1255,18 @@ void ModuleSanitizerCoverageLTO::instrumentFunction(
 
     for (auto &IN : BB) {
 
-      CallInst *callInst = nullptr;
+      CallBase *callInst = nullptr;
 
-      if ((callInst = dyn_cast<CallInst>(&IN))) {
+      if ((callInst = dyn_cast<CallBase>(&IN))) {
+
+        if (callInst->isIndirectCall()) continue;
 
         Function *Callee = callInst->getCalledFunction();
         if (!Callee) continue;
-        if (callInst->getCallingConv() != llvm::CallingConv::C) continue;
         StringRef FuncName = Callee->getName();
+
+        if (callInst->getCallingConv() != llvm::CallingConv::C) continue;
+
         if (!FuncName.compare(StringRef("dlopen")) ||
             !FuncName.compare(StringRef("_dlopen"))) {
 
@@ -1333,8 +1334,8 @@ void ModuleSanitizerCoverageLTO::instrumentFunction(
           }
 
           callInst->replaceAllUsesWith(MapPtrIdx);
-          // will delete later
-          DeprecatedCalls.push_back(callInst);
+
+          DeprecatedCalls.push_back(callInst); 
 
         }
         ++inst;
@@ -1500,6 +1501,17 @@ void ModuleSanitizerCoverageLTO::instrumentFunction(
   }
 
   for (auto I : DeprecatedCalls) {
+
+    if (auto invokeInst = dyn_cast<InvokeInst>(I)) {
+        
+     // Insert an unconditional branch to the normal destination.
+     BranchInst::Create(invokeInst->getNormalDest(), invokeInst);
+
+     // Remove any PHI node entries from the exception destination.
+     auto BB = invokeInst->getParent();
+     invokeInst->getUnwindDest()->removePredecessor(BB);
+
+    }
 
     I->eraseFromParent();
 
