@@ -2892,7 +2892,7 @@ havoc_stage:
 
 retry_splicing:
 
-  if (false && afl->use_splicing && splice_cycle++ < SPLICE_CYCLES &&
+  if (afl->use_splicing && splice_cycle++ < SPLICE_CYCLES &&
       afl->ready_for_splicing_count > 1 && afl->queue_cur->len >= 4) {
 
     struct queue_entry *target;
