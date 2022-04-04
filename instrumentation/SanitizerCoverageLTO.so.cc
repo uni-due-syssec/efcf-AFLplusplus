@@ -732,7 +732,7 @@ bool ModuleSanitizerCoverageLTO::instrumentModule(
             if (!HasStr2) {
 
               auto *Ptr = dyn_cast<ConstantExpr>(Str2P);
-              if (Ptr && Ptr->isGEPWithNoNotionalOverIndexing()) {
+              if (Ptr && Ptr->getOpcode() == Instruction::GetElementPtr) {
 
                 if (auto *Var = dyn_cast<GlobalVariable>(Ptr->getOperand(0))) {
 
@@ -813,7 +813,7 @@ bool ModuleSanitizerCoverageLTO::instrumentModule(
 
               auto Ptr = dyn_cast<ConstantExpr>(Str1P);
 
-              if (Ptr && Ptr->isGEPWithNoNotionalOverIndexing()) {
+              if (Ptr && Ptr->getOpcode() == Instruction::GetElementPtr) {
 
                 if (auto *Var = dyn_cast<GlobalVariable>(Ptr->getOperand(0))) {
 
@@ -1323,13 +1323,13 @@ void ModuleSanitizerCoverageLTO::instrumentFunction(
 
           if (map_addr) {
 
-            MapPtrIdx = IRB.CreateGEP(MapPtrFixed, CurLoc);
+            MapPtrIdx = IRB.CreateGEP(Int8Ty, MapPtrFixed, CurLoc);
 
           } else {
 
-            LoadInst *MapPtr = IRB.CreateLoad(AFLMapPtr);
-            SetNoSanitizeMetadata(MapPtr);
-            MapPtrIdx = IRB.CreateGEP(MapPtr, CurLoc);
+            LoadInst *MapPtr = IRB.CreateLoad(PointerType::get(Int8Ty, 0), AFLMapPtr);
+            ModuleSanitizerCoverageLTO::SetNoSanitizeMetadata(MapPtr);
+            MapPtrIdx = IRB.CreateGEP(Int8Ty, MapPtr, CurLoc);
 
           }
 
