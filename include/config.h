@@ -131,7 +131,7 @@
 
 /* Timeout rounding factor when auto-scaling (milliseconds): */
 
-#define EXEC_TM_ROUND 20U
+#define EXEC_TM_ROUND 50U
 
 /* 64bit arch MACRO */
 #if (defined(__x86_64__) || defined(__arm64__) || defined(__aarch64__))
