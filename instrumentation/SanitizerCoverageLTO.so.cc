@@ -1284,7 +1284,8 @@ void ModuleSanitizerCoverageLTO::instrumentFunction(
           Value *val = ConstantInt::get(Int32Ty, ++afl_global_id);
           callInst->setOperand(1, val);
 
-        } else if (FuncName.equals(StringRef("__afl_get_coverage_pointer"))) {
+        } else if (FuncName.equals(StringRef("__afl_get_coverage_pointer")) 
+                   || FuncName.equals(StringRef("__afl_get_coverage_array"))) {
 
           ConstantInt* CurLoc = nullptr;
           Value* user_id_val = callInst->getOperand(0);
@@ -1315,6 +1316,21 @@ void ModuleSanitizerCoverageLTO::instrumentFunction(
               UserIdToUniqueId.insert(std::make_pair(userid, uniqueid));
             }
             CurLoc = ConstantInt::get(Int32Tyi, uniqueid);
+          }
+
+          if (callInst->getNumArgOperands() >= 2) {
+            Value* array_size_v = callInst->getOperand(1);
+            if (array_size_v) {
+              auto const_arraysz = dyn_cast<ConstantInt>(array_size_v);
+              // not a constant as a parameter, not clear what the user intended so
+              // we keep the function call as is.
+              if (!const_arraysz) {
+                errs() << "non constant array size " << *array_size_v << "\n";
+                continue;
+              }
+              uint32_t array_size_i = (uint32_t)const_arraysz->getZExtValue();
+              afl_global_id += array_size_i - 1;
+            }
           }
 
           IRBuilder<> IRB(callInst);

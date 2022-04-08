@@ -2317,5 +2317,13 @@ u8* __afl_get_coverage_pointer(u32 id) {
   return __afl_area_ptr + (id % __afl_map_size);
 }
 
+u8* __afl_get_coverage_array(u32 id, size_t count) {
+  if (id + count < __afl_map_size) {
+    return __afl_area_ptr + (id % __afl_map_size);
+  } else {
+    return __afl_area_ptr + ((id + count) % __afl_map_size);
+  }
+}
+
 #undef write_error
 
