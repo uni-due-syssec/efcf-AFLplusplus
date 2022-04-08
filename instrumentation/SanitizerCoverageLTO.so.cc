@@ -1318,7 +1318,7 @@ void ModuleSanitizerCoverageLTO::instrumentFunction(
             CurLoc = ConstantInt::get(Int32Tyi, uniqueid);
           }
 
-          if (callInst->getNumOperands() >= 2) {
+          if (FuncName.equals(StringRef("__afl_get_coverage_array"))) {
             Value* array_size_v = callInst->getOperand(1);
             if (array_size_v) {
               auto const_arraysz = dyn_cast<ConstantInt>(array_size_v);
